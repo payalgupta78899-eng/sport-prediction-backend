@@ -1,0 +1,68 @@
+version: "3.9"
+
+services:
+
+  api:
+    build: .
+    container_name: fantasy_api
+    expose:
+      - "8000"
+    environment:
+      - DATABASE_URL=postgresql://fantasy_user:fantasy_pass@db:5432/fantasy_db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - SECRET_KEY=your-super-secret-key-change-in-production
+      - ALLOWED_ORIGINS=http://localhost:3000,https://fantasysports.com
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: always
+
+  db:
+    image: postgres:15-alpine
+    container_name: fantasy_db
+    environment:
+      - POSTGRES_USER=fantasy_user
+      - POSTGRES_PASSWORD=fantasy_pass
+      - POSTGRES_DB=fantasy_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    expose:
+      - "5432"
+    healthcheck:
+      test:     ["CMD-SHELL", "pg_isready -U fantasy_user"]
+      interval: 5s
+      timeout:  5s
+      retries:  5
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    container_name: fantasy_redis
+    expose:
+      - "6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test:     ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout:  5s
+      retries:  5
+    restart: always
+
+  nginx:
+    image: nginx:alpine
+    container_name: fantasy_nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api
+    restart: always
+
+volumes:
+  postgres_data:
+  redis_data:
